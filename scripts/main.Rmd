@@ -27,11 +27,25 @@ library(ggplot2) # plotting lib
 library(dplyr)  # data manipuation
 library(RColorBrewer) # color palettes
 library(xtable) # tabular data formatting 
+library(tm) # text mining
+library(summarytools)
+library(wordcloud)
+source('utils.R') # supplementary code
+
+
 
 # set xtable properties for the project
 options(xtable.floating = T)
 options(xtable.timestamp = "")
 options(xtable.comment = F)
+
+# set summarytools global parameters
+st_options(plain.ascii = F,       # This is very handy in all Rmd documents
+      style = "rmarkdown",        # This too
+      footnote = NA,             # Avoids footnotes which would clutter the result
+      subtitle.emphasis = F,  # This is a setting to experiment with - according to
+      dfSummary.graph.col = F
+)  
 
 # pick palettes
 mainPalette = brewer.pal(8,"Dark2")
@@ -39,7 +53,8 @@ mainPalette = brewer.pal(8,"Dark2")
 
 ```{r global_options, include=FALSE}
 # make the images flow nicely
-knitr::opts_chunk$set(fig.pos = 'H')
+knitr::opts_chunk$set(fig.pos = 'H', echo = T,comment = NA, prompt = F, 
+                      cache = F, warning = F, message = F)
 ```
 
 
@@ -96,10 +111,232 @@ state_senate_district       | Territorial district from which a senator to a sta
 
 ## Data Exploration
 
-```{r message=FALSE, warning=FALSE}
+Firstly we are going to load and examine content and statistics of the data set
 
+```{r }
+#data = read.csv("../data/gun-violence-data_01-2013_03-2018.csv", header = T, 
+#                na.strings = c("NA","","#NA"),sep=",")
+
+data = read.csv("../data/gun-violence-sample.csv", header = T, 
+                na.strings = c("NA","","#NA"),sep=",")
 ```
-  
+```{r dataset_summary, results = 'asis'}
+ print(dfSummary(data, valid.col = F, max.distinct.values = 4),
+       caption = "\\tt Gun Violence Dataset Summary")
+```
+
+Initial observation of the data shows that there is a number of features which do not present
+any analytical value (Figure:  \ref{fig:dataset_summary}). They are:
+
+* *incident_id*
+* *incident_url*
+* *source_url* 
+* *state_house_district*
+* *state_senate_district* 
+* *congressional_district*
+* *sources*
+* *incident_url_fields_missing*
+
+We also going to drop *participant_age* feature in favour of the *participant_age_group*. The age group is more suatable for categarization and has much less missing data (16% vs 39%).   
+
+The reamining features could be groupd as follows.
+
+##### Participant Features
+
+This group describes suspects and victims found on the crime scene. The content of the features of this group is structured as follows: *[idx1::value1||idx2::value2]* (see Figure \ref{fig:dataset_summary}). This is not quite acceptable for the analytics, thus the particiapnt related features would have to be parsed to extract valuable information about the crime.
+
+It is feasible. *utils.R* script contains *parseFeature* function, which parses *[idx1::value1||idx2::value2]* structure and returnes a named vector object. For example a  *participent_type* could be structured as follows:
+
+0            | 1            | 2               | 3
+-------------| -------------| ----------------| ---------------  
+Victim       | Victim       | Subject-Suspect | Subject-Suspect
+
+Unforunatley *participant_relationship* feature missing **93%** of values. It is not possible to impute the missing data thus we will drop it. For obvious reasons we are aslo going to get rid of *participant_name*. The rest of the participant-related features will be parsed and replaced wit the new categorical attributes. In order to do so we have to understand what possible values each particpant-related feature can have. for this we will employ text mining technique.
+
+We begin with *participant_type* feature
+
+```{r}
+participantType = data %>%  mutate(text = trimws(gsub('\\|\\||:|\\|'," ",participant_type, 
+        fixed = F))) %>% filter(text != "0" ) %>% select(text)
+
+pCorups = VCorpus(VectorSource(participantType))
+pCorups  = tm_map(pCorups , removeNumbers)
+pTermMatrix = tm::TermDocumentMatrix(pCorups)
+# count frequent words
+print(tm::findFreqTerms(pTermMatrix, 10))
+```
+As we can see the *participan type* may have two values *vitim* and *subject-suspect*. If the *participant type* is missing we will consider it as **unknown**. Thus we will be employing *participant type* feature as a basis to
+impute all other participant stats.
+
+Let's find the possible values of *parctipant_age_group* feature (the coded is ommitted).
+```{r echo=FALSE}
+participantAgeGroup = data %>%  mutate(text = trimws(gsub('\\|\\||:|\\|'," ",participant_age_group,
+      fixed = F))) %>% filter(text != "0" ) %>% select(text)
+participantAgeGroup = distinct(participantAgeGroup)
+pCorups = VCorpus(VectorSource(participantAgeGroup))
+pCorups  = tm_map(pCorups , removeNumbers)
+pTermMatrix = tm::TermDocumentMatrix(pCorups)
+print(tm::findFreqTerms(pTermMatrix, 10))
+```
+Further examination of the feature data shows that there the age group values are:
+
+* Adult 18+
+* Teen 12-17
+* Child 0-11
+
+Thus using *participant_age_group* feature data we will create two ne ones: *vicitm_age_group* and *suspect_age_group*. These new categorical features will be coded as follows: 
+
+* 0 - no info
+* 1 - all adults
+* 2 - children/ teens
+* 3 - adults and children/ teens . Adults make majority
+* 4 - adults and children/ teens. Chlidren/ teens make majority
+
+*participant_gender* could also be parsed and replaced with the coded categorical features as descrived below.
+```{r}
+participantGender = data %>%  mutate(text = trimws(gsub('\\|\\||:|\\|'," ",participant_gender, 
+        fixed = F))) %>% filter(text != "0" ) %>% select(text)
+pCorups = VCorpus(VectorSource(participantGender))
+pCorups  = tm_map(pCorups , removeNumbers)
+pTermMatrix = tm::TermDocumentMatrix(pCorups)
+print(tm::findFreqTerms(pTermMatrix, 10))
+```
+As a result we will be adding two new features:
+
+*victim_gender* - gender of the victims
+*suspect_gender* - gender of the suspects
+
+**Gender Codes**
+
+* 0 - no info
+* 1 - male  
+* 2 - female
+* 3 - male dominated group
+* 4 - femail dominated goup
+
+The last feature of the group is *participant_status*. It maintains the outcome of the incident. Let's review the content of the attribute.
+
+```{r echo=FALSE}
+participantStatus = data %>%  mutate(text = trimws(gsub('\\|\\||:|\\|'," ",participant_status, 
+        fixed = F))) %>% filter(text != "0" ) %>% select(text)
+pCorups = VCorpus(VectorSource(participantStatus))
+pCorups  = tm_map(pCorups , removeNumbers)
+pTermMatrix = tm::TermDocumentMatrix(pCorups)
+print(tm::findFreqTerms(pTermMatrix, 10))
+```
+Based on our findings we will be creating three new numerical features:
+
+* n_victim_killed - number of victims killed
+* n_victim_injured - number of victims injured
+* n_arrested - number of suspects arrested
+
+##### Gun Related Features
+
+There are three attributes that describe gun types: *gun_stolen*, *gun_type* and *n_guns_invoved* (Figure: \ref{fig:dataset_summary}) *gun_type* and *gun_stolen* have similar to the participant-related faetures encoding (*[idx1::value1||idx2::value2]*). Thus they also could be parsed and substituded with the categorical features.
+We begin with the gun type.
+```{r plot_gun_types,  echo=FALSE, fig.align="center", fig.cap="The Most Frequently Used Gun Types"}
+gunTypes = data %>%  mutate(text = trimws(gsub('\\|\\||:|\\||Unknown'," ",gun_type, fixed = F))) %>% 
+  filter(text != "0" ) %>% select(text)
+pCorups = VCorpus(VectorSource(gunTypes))
+pCorups  = tm_map(pCorups , removeNumbers)
+pCorups  = tm_map(pCorups , removePunctuation)
+pTermMatrix = tm::TermDocumentMatrix(pCorups)
+tmp = as.matrix(pTermMatrix)
+tmp = sort(rowSums(tmp),decreasing=T)
+tmp = data.frame(word = names(tmp),freq=tmp)
+set.seed(1234)
+wordcloud(words = tmp$word, freq = tmp$freq, min.freq = 1,max.words=100, random.order=F,
+          rot.per=0.35, colors=mainPalette)
+```
+Employing simple text mining techniques we can see that **handgun**, **rifle**, **shotgun** and **auto** make the majority. Thus we will add ane feature *gun_type_involved* to categorize the gun types as follows:
+
+* 0 - unknown 
+* 1 - handgun
+* 2 - shotgun/ rifle
+* 3 - automatic
+* 4 - mix/other 
+
+*gun_stolen* attribute tells if the gun was stolen or aquired legally. We are going to create a new categorical feature - *gun_origin* which would maintain the folloing data:
+
+* 0 - unknown
+* 1 - all stolen
+* 2 - all acquired legally
+* 3 - mix of stolen and legal guns
+
+
+##### Location Related Features
+
+To analyze geography of the crimes we will be employing *state*, *city_or_county*, *latitude* and *longitude* atrribute. since we have the coordinates the *address* feature does not present much value for unsupervised learning. We will be using it though to impute missing latitude and longitude values. This activity will be covered in greater details in **Missing Data** paragraph.
+
+#### Descriptive Features
+
+*notes*, *location_description* and *incident_characteristics* are free-text features that might provide additional insights about the crime scene. We are going to take a close look at each feature and decide if we could utilize it.
+
+Lets' begin with the *notes*
+```{r plot_notes,  echo=FALSE, fig.align="center", fig.cap="Most Common Words in Notes"}
+notes = data %>%  mutate(text = trimws(notes)) %>% filter(!is.na(text)) %>% select(text)
+pCorups = VCorpus(VectorSource(notes))
+pCorups  = tm_map(pCorups , removeNumbers)
+pCorups  = tm_map(pCorups , removePunctuation)
+pTermMatrix = tm::TermDocumentMatrix(pCorups)
+tmp = as.matrix(pTermMatrix)
+tmp = sort(rowSums(tmp),decreasing=T)
+tmp = data.frame(word = names(tmp),freq=tmp)
+set.seed(5673)
+wordcloud(words = tmp$word, freq = tmp$freq, min.freq = 10,max.words=200, random.order=F,
+          rot.per=0.35, colors=mainPalette)
+```
+Unfortunately *notes* feature does not provide more knowlege to what the others features already supply. Thus it will be dropped.
+
+*location_description* on the other hand, could be useful to classify location type. Unfortunately 82% of the data is missing. Nonetheless this feature appears to be too important to ignore. Let's see how much we can salvage.
+```{r plot_location,  echo=FALSE, fig.align="center", fig.cap="Most Common Bi-gram Terms in Location Decription"}
+location = data %>%  mutate(text = trimws(location_description)) %>% filter(!is.na(text)) %>% select(text)
+pCorups = VCorpus(VectorSource(location))
+pCorups  = tm_map(pCorups , removeNumbers)
+pCorups  = tm_map(pCorups , removePunctuation)
+pCorups = tm_map(pCorups, removeWords, stopwords())
+pTermMatrix = tm::TermDocumentMatrix(pCorups, control = list(tokenize = BigramTokenizer))
+tmp = as.matrix(pTermMatrix)
+tmp = sort(rowSums(tmp),decreasing=T)
+tmp = data.frame(word = names(tmp),freq=tmp)
+set.seed(901)
+wordcloud(words = tmp$word, freq = tmp$freq,min.freq=30, max.words=100, random.order=F,
+          rot.per=0.3, colors=mainPalette,scale=c(3,.5))
+```
+
+As plot \ref{fig:plot_location} shows we could utilize bi-gram terms if the location description is available. Thus let's add new categorical feature - *place_type*, which would have the fllowing values:
+
+* 0 - unknown
+* 1 - school/ university/ college
+* 2 - community center/ shopping center/ hospital/ church
+* 3 - home invasion
+* 4 - street/drive by
+* 5 - other public places
+
+The last feature in the group is *incident_characteristics*. The feature is almost 100% populated. As with the previous two we are going to find out what info it maintains.
+
+```{r plot_char,  echo=FALSE, fig.align="center", fig.cap="Most Common Bi-gram Terms in Location Decription"}
+characteristics = data %>%  mutate(text = gsub('\\|\\||/'," ",incident_characteristics, fixed = F))  %>%                 filter(!is.na(text)) %>% select(text)
+pCorups = VCorpus(VectorSource(characteristics))
+pCorups  = tm_map(pCorups , removeNumbers)
+pCorups  = tm_map(pCorups , removePunctuation)
+pCorups = tm_map(pCorups, removeWords, stopwords())
+pTermMatrix = tm::TermDocumentMatrix(pCorups, control = list(tokenize = BigramTokenizer))
+tmp = as.matrix(pTermMatrix)
+tmp = sort(rowSums(tmp),decreasing=T)
+tmp = data.frame(word = names(tmp),freq=tmp)
+head(tmp, 50)
+```
+Information the feature provides proved to be useful. It can support two features: *place_type*, which was introduced above and *inceident_type*. The *incident_type* is going to be a categorical attribute with the following codes:
+
+* 0 - unknown
+* 1 - accidental
+* 2 - defensive use
+* 3 - armded robbery
+* 4 - suicide
+* 5 - raid/ arrest/ warrant
+* 6 - domestic violence
+* 7 - gun brandishing, flourishing, open demonstration 
 
 ### Missing Data
 
