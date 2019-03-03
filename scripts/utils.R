@@ -48,7 +48,7 @@ imputeCoordinates <- function() {
   # sort by date
   data = data[order(data$date),] 
   # take the last year observations from data set
-  #data = data %>% filter(date < as.Date('2017-03-01'))
+  #data = data %>% filter(date >= as.Date('2017-03-01'))
 
   missingCoord <- data %>% filter(is.na(latitude) )
 
