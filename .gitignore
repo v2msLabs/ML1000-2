@@ -3,3 +3,6 @@
 .RData
 .Ruserdata
 /scripts/main.tex
+/scripts/RJwrapper.log
+/data/gun-violence-sample.csv
+/scripts/data_summary.pdf
