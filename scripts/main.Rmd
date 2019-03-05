@@ -715,30 +715,58 @@ And again the result is very good. Now it is time to explore the data
 
 We decided to choose agglomerative clustering vs devisive method because the former generally has less challanges than th latter. In the case of the devisive method it is not quite clear how to aprtition a large cluster into a smaller one. We opted to cut the tree at six clusters. We employed *euclidean* disimaliy 
 
+
+So in conclusion, I believe that categorical data does not cluster in the way clustering is commonly defined because the discrete nature yields too little discrimination/ranking of similarities. It may have frequent patterns as detected e.g. by Apriori, but that is a very different definition. And how to combine these two is not obvious. So for categorical data, I recommend frequent patterns. These make much more sense than "clusters".
+
 ```{r}
+# http://eric.univ-lyon2.fr/~ricco/cours/slides/en/classif_interpretation.pdf
 
+victimStats1 = victimStats[c("","n_victims","place_type")] 
+victimStats1S = victimStats1 %>% scale()
 
-data("USArrests") # Standardize the data df <- scale( USArrests)
-
-df = USArrests 
-
-dfs = df %>% scale()
-
-res.dist <- dist( dfs, method = "euclidean")
-
-res.hc <- hclust( d = res.dist, method = "ward.D2")
- 
-str(victimStats)
-
-library(cluster )
-
-
-agnesCont = factoextra::hcut(victimStatsCont, k = 10,  hc_func ="agnes", 
+agnesCont = factoextra::hcut(victimStats1S, k = 6,  hc_func ="agnes", 
                          hc_method = "ward.D2", hc_metric = "euclidean",stand = F)
 
-agnesDataCont = cbind(victimStats,agnesCont$cluster)
+#victim2StatsCont = victimStats[c("n_victims","n_suspects","n_guns_involved","n_killed","n_inj#ured")]
 
-agnesDataCont2 = subset(agnesDataCont,select = c(agnesCont$cluster))
+fviz_silhouette(agnesCont)
+
+fviz_cluster(agnesCont,   geom = "point",
+             axes = c(1,2), xlab = "N Victims", ylab = "Place")
+
+agnesData = cbind(victimStats1,cluster=agnesCont$cluster)
+
+c1 = agnesData %>% filter(cluster == 1) 
+
+plot(c1$place_type,c1$n_victims)
+
+c2 = agnesData %>% filter(cluster == 2) 
+
+plot(c2$place_type,c2$n_victims)
+
+library(fastDummies)
+
+victim3StatsCont =  mutate(victimStats, place_type = as.factor(place_type)) %>% 
+  select(place_type, n_victims)
+
+victim3StatsCont = fastDummies::dummy_cols(victim3StatsCont,  select_columns = "place_type")
+
+victim3StatsCont = victim3StatsCont[,-1]
+victim33StatsCont = victim3StatsCont %>% scale()
+
+
+agnes3Cont = factoextra::hcut(victim3StatsCont, k = 10,  hc_func ="agnes", 
+                         hc_method = "ward.D2", hc_metric = "euclidean",stand = F)
+
+agnes3Data = cbind(victim3StatsCont,cluster=agnes3Cont$cluster)
+
+fviz_cluster(agnes3Cont,   geom = "point",
+             axes = c(1,2), xlab = "N Victims", ylab = "N Suspects")
+
+fviz_silhouette(agnes3Cont)
+
+
+
 
 
 victimStats2 = subset(victimStats, select = c(n_victims, n_suspects))
