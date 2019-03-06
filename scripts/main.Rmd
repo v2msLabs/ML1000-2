@@ -10,7 +10,7 @@ author:
   - name: Vadim Spirkov
     affiliation: York University School of Continuing Studies
 abstract: >
-  To do
+  Gun deaths in US rise to highest level in 20 years. Forty thousand people were killed in shootings in 2017 amid a growing number of suicides involving firearms. Research by the Educational Fund to Stop Gun Violence underlines that the tragedy of gun violence and suicides is not spread randomly across the country, but is concentrated precisely in those places where gun ownership is most prevalent and gun laws at their loosest. Using the data collected by Gun Violence Archive (GVA) and employing unsupervised learning methods we will make an attempt to provide additional insights into the nature of this sad  statistics. 
 
 output:
   rticles::rjournal_article:
@@ -24,23 +24,17 @@ output:
 rm(list=ls(all=TRUE))
 # load required libraries
 library(ggplot2) # plotting lib
+library(gridExtra) # arrange grids
 library(dplyr)  # data manipuation
 library(RColorBrewer) # color palettes
-library(xtable) # tabular data formatting 
 library(tm) # text mining
 library(dbscan) # density-based clustering
 library(wordcloud) # plots fequent terms
 library(factoextra) # deals with cluster plotting. Provides cluster related utility methods 
 library(cluster) # for gower similarity and pam
 library(plot3D) # 3D plots
+library(summarytools)
 source('utils.R') # supplementary code
-
-
-
-# set xtable properties for the project
-options(xtable.floating = F)
-options(xtable.timestamp = "")
-options(xtable.comment = F)
 
 # set summarytools global parameters
 st_options(plain.ascii = F,       # This is very handy in all Rmd documents
@@ -50,8 +44,7 @@ st_options(plain.ascii = F,       # This is very handy in all Rmd documents
       dfSummary.graph.col = F
 )  
 
-# pick palettes
-
+# pick a palette
 mainPalette = ggplotColours()
 ```
 
@@ -67,7 +60,7 @@ knitr::opts_chunk$set(fig.pos = 'H', echo = T,comment = NA, prompt = F,
 
 ## Objective
 
-The objective of this research is to ...
+The objective of this research is to discover trends and tendancies in the gun violence developmen in the US employing unsupervised learning approaches.
 
 
 # Data Analysis
@@ -123,9 +116,8 @@ data = read.csv("../data/gun-violence-data_01-2013_03-2018.csv", header = T,
 ```
 
 ```{r dataset_summary, echo=FALSE, results="asis"}
-library(stargazer)
 print(dfSummary(data, valid.col = F, max.distinct.values = 3, heading = F),
-       caption = "\\label{tab:dataset_summary} Gun Violence Dataset Summary")
+       caption = "\\label{tab:dataset_summary} Gun Violence Dataset Summary", scalebbox = .9)
 ```
 
 Initial observation of the data shows that there is a number of features which do not present
@@ -140,9 +132,7 @@ any analytical value (Table:  \ref{tab:dataset_summary}). They are:
 * *sources*
 * *incident_url_fields_missing*
 
-We also going to drop *participant_age* feature in favor of the *participant_age_group*. The age group is more suitable for categorization and has much less missing data (16% vs 39%).   
-
-The remaining features could be grouped as follows...
+We are going to get rid of them. We will also drop *participant_age* feature in favor of the *participant_age_group*. The age group is more suitable for categorization and has much less missing data (16% vs 39%). The remaining features could be grouped as follows...
 
 ##### Participant Features.
 
@@ -154,7 +144,7 @@ It is feasible. *utils.R* script contains *parseFeature* function, which parses 
 -------------| -------------| ----------------| ---------------  
 Victim       | Victim       | Subject-Suspect | Subject-Suspect
 
-Unfortunately *participant_relationship* feature missing **93%** of values. It is not possible to impute the missing data thus we will drop it. For obvious reasons we are also going to get rid of *participant_name*. The rest of the participant-related features will be parsed and replaced wit the new categorical attributes. In order to do so we have to understand what possible values each participant-related feature can have. for this we will employ text mining technique.
+Unfortunately *participant_relationship* feature missing **93%** of values. It is not possible to impute the missing data thus we will drop it. For obvious reasons we are also going to get rid of *participant_name*. The rest of the participant-related features will be parsed and replaced wit the new categorical attributes. In order to do so we have to understand what possible values each participant-related feature can have. To do so  we will employ text mining technique. We will analyze term frequencies to make conclusions abou the content of the features 
 
 We begin with *participant_type* feature
 
@@ -165,11 +155,9 @@ participantType = data %>%  mutate(text = trimws(gsub('\\|\\||:|\\|'," ",partici
 pCorups = VCorpus(VectorSource(participantType))
 pCorups  = tm_map(pCorups , removeNumbers)
 pTermMatrix = tm::TermDocumentMatrix(pCorups)
-# count frequent words
 print(tm::findFreqTerms(pTermMatrix, 10))
 ```
-As we can see the *participan type* may have two values *vitim* and *subject-suspect*. If the *participant type* is missing we will consider it as **unknown**. Thus we will be employing *participant type* feature as a basis to
-impute all other participant stats.
+As we can see the *participan type* may have two values **vitim** and **subject-suspect**. If the *participant type* is missing we will consider it as **unknown**. Thus we will be employing *participant_type* feature as a basis to impute all other participant related stats.
 
 Let's find the possible values of *parctipant_age_group* feature (the coded is omitted).
 ```{r echo=FALSE}
@@ -247,9 +235,8 @@ pTermMatrix = tm::TermDocumentMatrix(pCorups)
 tmp = as.matrix(pTermMatrix)
 tmp = sort(rowSums(tmp),decreasing=T)
 tmp = data.frame(word = names(tmp),freq=tmp)
-set.seed(1234)
-wordcloud(words = tmp$word, freq = tmp$freq, min.freq = 1,max.words=100, random.order=F,
-          rot.per=0.35, colors=mainPalette)
+ggplot(tmp,aes(x=word, y=freq )) + 
+      geom_col(fill=mainPalette[8], colour=mainPalette[8], alpha = 0.5)
 ```
 Employing simple text mining techniques we can see that **handgun**, **rifle**, **shotgun** and **auto** make the majority. Thus we will add another new feature *gun_type_involved* to categorize the gun types as follows:
 
@@ -269,7 +256,7 @@ Employing simple text mining techniques we can see that **handgun**, **rifle**, 
 
 ##### Location Related Features.
 
-To analyze geography of the crimes we will be employing *state*, *city_or_county*, *latitude* and *longitude* attribute. since we have the coordinates the *address* feature does not present much value for unsupervised learning. We will be using it though to impute missing latitude and longitude values. This activity will be covered in greater details in **Missing Data** paragraph.
+To analyze geography of the crimes we will be employing *state*, *city_or_county*, *latitude* and *longitude* attribute. Since we have the coordinates the *address* feature does not present much value for unsupervised learning. We will be using it though to impute missing latitude and longitude values. This activity will be covered in greater details in **Missing Data** paragraph.
 
 #### Descriptive Features.
 
@@ -318,7 +305,7 @@ As plot \ref{fig:plot_location} shows we could utilize bi-gram terms if the loca
 
 The last feature in the group is *incident_characteristics*. The feature is almost 100% populated. As with the previous two we are going to find out what info it maintains.
 
-```{r include=FALSE}
+```{r plot_freq_char, echo=FALSE, fig.align="center", fig.cap="Most Common Bi-gram Terms in Incident Characteristics Column" }
 characteristics = data %>%  mutate(text = gsub('\\|\\||/'," ",incident_characteristics, fixed = F))  %>%                 filter(!is.na(text)) %>% select(text)
 pCorups = VCorpus(VectorSource(characteristics))
 pCorups  = tm_map(pCorups , removeNumbers)
@@ -327,13 +314,11 @@ pCorups = tm_map(pCorups, removeWords, stopwords())
 pTermMatrix = tm::TermDocumentMatrix(pCorups, control = list(tokenize = BigramTokenizer))
 tmp = as.matrix(pTermMatrix)
 tmp = sort(rowSums(tmp),decreasing=T)
-tmp = data.frame(word = names(tmp),freq=tmp)
-
-```
-```{r echo=TRUE, results="asis"}
-print(xtable(tmp[1:50,1:2],
-      caption = "\\tt Most Frequently Used Incident Characteristics  Bi-grams"),
-      row.names = FALSE,  include.rownames = FALSE)
+tmp = data.frame(word = names(tmp),freq=tmp) 
+tmp = tmp %>% top_n(n = 50)
+ggplot(tmp, aes(x=word, y=freq )) + 
+      geom_col(fill=mainPalette[1], colour=mainPalette[1], alpha = 0.5,
+               position = position_stack(reverse = T)) + coord_flip()
 ```
 
 Information the *incident_characteristics* provides proved to be useful. It can support two features: *place_type*, which was introduced above and *inceident_type*. The *incident_type* is going to be a categorical attribute with the following codes:
@@ -352,7 +337,6 @@ We are also be adding a feature that indicates if drugs or alcohol was involved:
 ##### Date Feature
 
 In addition to *date* of incident attribute we add *month*  and *day_of_week* to identify any seasonal patterns. 
-
 
 ## Data Preparation
 
@@ -641,7 +625,7 @@ for (idx in 1:nrow(data)) {
 }  
 ```
 
-After we added new feature it is time to remove the columns that are no longer relevant and save the result into a file to be used for unsupervised learning
+After we added new feature it is time to remove the columns that are no longer relevant and save the result into a file to be used for the unsupervised learning.
 
 ```{r}
 data = subset(data, select = c(-participant_age_group, -participant_type,
@@ -656,7 +640,7 @@ rm(data, gunTypes,location,notes, participantAgeGroup, participantGender,partici
 
 ## Resulting Dataset
 
-After a rather lengthy process, we finally have reached the stage when our data set is ready to be used for exploration by clustering algorithms. All missing features have been imputed and free-format text columns have been replaced with the categorical attributes.  This is the summary of the resulting data.
+After a rather lengthy process, we finally have reached the stage when our dataset is ready to be used for exploration by clustering algorithms. All missing features have been imputed and free-format text columns have been replaced with the categorical attributes.  This is the summary of the resulting data.
 
 
 ```{r include=FALSE}
@@ -664,7 +648,7 @@ data = read.csv("../data/gun-violence-engineered.csv", header = T,sep=",")
 ```
 ```{r dataset_engineered, results = 'asis'}
  print(dfSummary(data, valid.col = F, max.distinct.values = 3, headings = F),
-       caption = "\\tt Engineered Gun Violence Dataset Summary")
+       caption = "\\tt Engineered Gun Violence Dataset Summary", scalebox = .9)
 ```
 
 
@@ -694,16 +678,14 @@ The **H** value close to zero indicates very good clustering tendency. The **H**
 
 ```{r}
 stats = victimStats[c("n_victims","n_suspects","n_guns_involved","n_killed","n_injured")] %>% scale()
-
 H =  get_clust_tendency(stats,n = 100, graph = F, seed = 6709)
 print(H[["hopkins_stat"]])
 ```
 
-Outstanding!  **H** value is very close to 0. Let' calculate Hopkins statistics on some categorical features
+Outstanding!  **H** value is very close to 0. Let's calculate Hopkins statistics on some categorical features
 
 ```{r}
 stats = victimStats[c("gun_type_involved","victim_gender","place_type","victim_age_group","suspect_gender")] %>% scale()
-
 H =  get_clust_tendency(stats, n = 100, graph = F, seed = 6701)
 print(H[["hopkins_stat"]])
 ```
@@ -714,7 +696,6 @@ Well, the categorical data do not seem to be so suitable for clustering, **H** g
 stats = victimStats[c("n_victims","n_suspects","n_guns_involved","n_killed","n_injured",
         "gun_type_involved","victim_gender","place_type","victim_age_group",
         "suspect_gender")] %>% scale()
-
 H =  get_clust_tendency(stats, n = 100, graph = F, seed = 6701)
 print(H[["hopkins_stat"]])
 ```
@@ -722,19 +703,19 @@ The **H** number is very encouraging again. It appears we would have to combine 
 
 ## Partitioning Clustering Approach Using CLARA
 
-We decide to select CLARA algorithm because it scales well and can deal with continuous and categorical data. It is based on The **Partitioning Around Medoids** (*PAM*) algorithm, which is a popular realization of k-medoids clustering.We start with univariate data set for simplicity. Then we will take a look at silhouette plot to analyze the result. The silhouette coefficient measure how well the clusters are separated. The silhouette analysis also provides data on the cluster density.
+We decided to select CLARA method because it scales well and can deal with continuous and categorical data. It is based on The **Partitioning Around Medoids** (*PAM*) algorithm, which is a popular realization of k-medoids clustering. We start with univariate data set for simplicity. Then we will take a look at silhouette plot to analyze the result. The silhouette coefficient measure how well the clusters are separated. The silhouette analysis also provides insights into the cluster density.
 
-Let's see how *n_victim* feature could be split by *CLARA*. The method also scales the data
+Let's see how *n_victim* feature could be split by *CLARA*. The method also scales the data.
 
-```{r plot_clara1, fig.align="center", fig.cap="CLARA Approach. Univariate Feature, 4 Cluster Silhouette"}
+```{r plot_clara1, echo = FALSE, fig.align="center", fig.cap="CLARA Approach. Univariate Feature, 4 Cluster Silhouette", fig.height = 4}
 stats = victimStats[c("n_victims")] 
 clara = clara(stats, k = 4, metric = "euclidean",stand = T, samples = 100, sampsize =500)
-fviz_silhouette(clara, title = "") 
+fviz_silhouette(clara, title = "") +
   theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
 ```
 The result looks very good. The clusters are dense and well separated. The last cluster doe not look perfect, probably it contains the incidents, where number of victims is very high.
 To better interpret the cluster content let's merge the clustering result with the original data set and render a scatter plot. 
-```{r plot_clara2, fig.align="center", fig.cap="CLARA Approach. Number of Victims/Cluster Scatter Plot", echo = FALSE}
+```{r plot_clara2, echo = FALSE, fig.align="center", fig.cap="CLARA Approach. Number of Victims/Cluster Scatter Plot", echo = FALSE}
 combined = cbind(stats, cluster=c(clara$clustering))
 ggplot(data = combined, aes(x=cluster, y=n_victims)) +
    geom_point(size=3, color=mainPalette[1])
@@ -748,7 +729,7 @@ ggplot(victimStats, aes(x=longitude, y=latitude )) +
 ```
 
 Very well! Now we are going to add a categorical feature and see if could get meaningful clusters
-```{r plot_clara4, fig.align="center", fig.cap="CLARA Approach. Two Feature, 4 Cluster Silhouette"}
+```{r plot_clara4, echo = FALSE, fig.align="center", fig.cap="CLARA Approach. Two Feature, 4 Cluster Silhouette", , fig.height = 4}
 
 stats = victimStats[c("n_victims","place_type")] 
 clara = clara(stats, k = 4, metric = "euclidean",stand = T, samples = 100, sampsize =500)
