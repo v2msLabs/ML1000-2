@@ -20,13 +20,8 @@ div.outer {
   opacity: 0.85;
 }
 
-
-
-.selected-map-label {
-  font-weight:bold;
-  font-size:14px!important;
-  background-color:black;
-  color:white;
+.btn {
+  background-color:rgb(172, 219, 129);
 }
 
 .map-label {

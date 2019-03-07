@@ -50,7 +50,7 @@ ui <- bootstrapPage( theme = "styles.css",
       bsTooltip("m", "Select the metric to be used for calculating dissimilarities between observations",
                 placement = "right"),
       # action
-      actionButton("cluster", "Clusters Data")
+      actionButton("cluster", "Clusters Data", class = "btn")
     )
 ))
 
@@ -63,7 +63,7 @@ server <- function(input, output) {
     map <- leafletProxy("map")
     map %>%  clearMarkers() %>%
       addCircleMarkers(data = victimData, lng = ~longitude, lat = ~latitude,
-                       label =paste0("Cluster: ",clusters," Vicitms: ",victimData$n_victims,
+                       label =paste0("Cluster: ",clusters," Date: ",victimData$date," Vicitms: ",victimData$n_victims,
                        " Suspects: ",victimData$n_suspects," Place: ",lapply(victimData$place_type,placeDecoder)), 
                        color = ~colors(clusters), fillColor = ~colors(clusters), radius = ~n_victims+2, weight = 4,
                        opacity = 1, fillOpacity = .7,
@@ -75,7 +75,7 @@ server <- function(input, output) {
   output$map <- renderLeaflet({
     map = leaflet() %>% setView(lng = -100.957969, lat = 41.116280, zoom = 5 ) %>% addTiles() %>% 
     addCircleMarkers(data = victimData, lng = ~longitude, lat = ~latitude,
-    label =paste0("Cluster: ",clusters," Vicitms: ",victimData$n_victims,
+    label =paste0("Cluster: ",clusters," Date: ",victimData$date," Vicitms: ",victimData$n_victims,
       " Suspects: ",victimData$n_suspects," Place: ",lapply(victimData$place_type,placeDecoder)), 
       color = ~colors(clusters), fillColor = ~colors(clusters), radius = ~n_victims+2, weight = 4,
       opacity = 1, fillOpacity = .4,
