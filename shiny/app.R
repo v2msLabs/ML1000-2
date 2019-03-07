@@ -42,7 +42,7 @@ ui <- bootstrapPage( theme = "styles.css",
       h4("Data clustering by number of victims of the incident"),
       #1 Input: Simple Humidity3pm ----
       sliderInput("k", "Number of Clusters:",min = 2, max = 10,
-      value = 4, step = 1),
+      value = 8, step = 1),
       bsTooltip("k", "Specify number of clusters",  placement = "right"),
                                          
       #2 Input: Metrics ----
