@@ -51,16 +51,18 @@ mainPalette = ggplotColours()
 ```{r global_options, include=FALSE}
 # make the images flow nicely
 knitr::opts_chunk$set(fig.pos = 'H', echo = T,comment = NA, prompt = F, 
-                      cache = F, warning = F, message = F)
+                      cache = F, warning = F, message = F,  fig.align="center")
 ```
 
 
 ## Background
 
+Gun violence in the US is a groing problem. Mass-shooting, gun-assited suisides, accidental use of guns that cause death have become regular topic of the news agencies.  
+
 
 ## Objective
 
-The objective of this research is to discover trends and tendancies in the gun violence developmen in the US employing unsupervised learning approaches.
+The objective of this research is to discover trends and tendencies of the gun violence situation in the US employing unsupervised learning algorithms.
 
 
 # Data Analysis
@@ -144,7 +146,7 @@ It is feasible. *utils.R* script contains *parseFeature* function, which parses 
 -------------| -------------| ----------------| ---------------  
 Victim       | Victim       | Subject-Suspect | Subject-Suspect
 
-Unfortunately *participant_relationship* feature missing **93%** of values. It is not possible to impute the missing data thus we will drop it. For obvious reasons we are also going to get rid of *participant_name*. The rest of the participant-related features will be parsed and replaced wit the new categorical attributes. In order to do so we have to understand what possible values each participant-related feature can have. To do so  we will employ text mining technique. We will analyze term frequencies to make conclusions abou the content of the features 
+Unfortunately *participant_relationship* feature missing **93%** of values. It is not possible to impute the missing data thus we will drop it. For obvious reasons we are also going to get rid of *participant_name*. The rest of the participant-related features will be parsed and replaced wit the new categorical attributes. In order to do so we have to understand what possible values each participant-related feature can have. To do so  we will employ text mining technique (Ref: \cite{tm}). We will analyze term frequencies to make conclusions about the content of the features. 
 
 We begin with *participant_type* feature
 
@@ -656,7 +658,7 @@ data = read.csv("../data/gun-violence-engineered.csv", header = T,sep=",")
 
 In this section we will apply various clustering methods to explore gun violence trends in the US. We will use parallel, hierarchical and density-based clustering approaches. 
 
-In general the clustering algorithms take time to compute the result. Thus we will be employing a smaller dataset to find and visualize the clusters. We will be exploring the incidents, that have at least three victims and where a place type was recorded.
+In general the clustering algorithms take time to compute the result. Thus we will be employing a smaller dataset to find and visualize the clusters. The focus of our interests will be the incidents, that have at least three victims and where a place type was recorded.
 
 ```{r}
 victimStats = data %>% filter(n_victims >= 3 & place_type>0) %>% arrange(date)
@@ -674,7 +676,7 @@ Hopkins statistic is used to assess the clustering tendency of a dataset by meas
 * n_killed
 * n_injured
 
-The **H** value close to zero indicates very good clustering tendency. The **H** value around or greater than 0.5 denotes poor clustering tendency. We 
+The **H** value close to zero indicates very good clustering tendency. The **H** value around or greater than 0.5 denotes poor clustering tendency(Ref: \cite{factoextra}). 
 
 ```{r}
 stats = victimStats[c("n_victims","n_suspects","n_guns_involved","n_killed","n_injured")] %>% scale()
@@ -703,11 +705,11 @@ The **H** number is very encouraging again. It appears we would have to combine 
 
 ## Partitioning Clustering Approach Using CLARA
 
-We decided to select CLARA method because it scales well and can deal with continuous and categorical data. It is based on The **Partitioning Around Medoids** (*PAM*) algorithm, which is a popular realization of k-medoids clustering. We start with univariate data set for simplicity. Then we will take a look at silhouette plot to analyze the result. The silhouette coefficient measure how well the clusters are separated. The silhouette analysis also provides insights into the cluster density.
+We decided to select CLARA method because it scales well and can deal with continuous and categorical data. It is based on The **Partitioning Around Medoids** (*PAM*) algorithm, which is a popular realization of k-medoids clustering. We start with univariate data set for simplicity. Then we will take a look at silhouette plot (Ref: \cite{factoextra}) to analyze the result. The silhouette coefficient measure how well the clusters are separated. The silhouette analysis also provides insights into the cluster density.
 
 Let's see how *n_victim* feature could be split by *CLARA*. The method also scales the data.
 
-```{r plot_clara1, echo = FALSE, fig.align="center", fig.cap="CLARA Approach. Univariate Feature, 4 Cluster Silhouette", fig.height = 4}
+```{r plot_clara1, echo = FALSE,  fig.cap="CLARA Approach. Univariate Feature, 4 Cluster Silhouette", out.width = "70%"}
 stats = victimStats[c("n_victims")] 
 clara = clara(stats, k = 4, metric = "euclidean",stand = T, samples = 100, sampsize =500)
 fviz_silhouette(clara, title = "") +
@@ -715,21 +717,21 @@ fviz_silhouette(clara, title = "") +
 ```
 The result looks very good. The clusters are dense and well separated. The last cluster doe not look perfect, probably it contains the incidents, where number of victims is very high.
 To better interpret the cluster content let's merge the clustering result with the original data set and render a scatter plot. 
-```{r plot_clara2, echo = FALSE, fig.align="center", fig.cap="CLARA Approach. Number of Victims/Cluster Scatter Plot", echo = FALSE}
+```{r plot_clara2, echo = FALSE, fig.cap="CLARA Approach. Number of Victims/Cluster Scatter Plot", echo = FALSE, out.width = "70%"}
 combined = cbind(stats, cluster=c(clara$clustering))
 ggplot(data = combined, aes(x=cluster, y=n_victims)) +
    geom_point(size=3, color=mainPalette[1])
 ```
 
 As we can see the cluster number one groups the incidents where number of victims is around 3. The cluster number 2 contains the incidents with 4 victims, the # 3 combines the incidents with the number of victims between 5 and 6. And the rest goes to the cluster #4. Here is the geo-location of the clustered incidents
-```{r plot_clara3, fig.align="center", fig.cap="CLARA Approach. Number of Victims Clusters on Map", echo = FALSE}
+```{r plot_clara3, fig.cap="CLARA Approach. Number of Victims Clusters on Map", echo = FALSE, out.width = "70%"}
 combined = cbind(victimStats, cluster=c(clara$clustering))
 ggplot(victimStats, aes(x=longitude, y=latitude )) + 
   geom_point( color= clara$clustering+1L)
 ```
 
 Very well! Now we are going to add a categorical feature and see if could get meaningful clusters
-```{r plot_clara4, echo = FALSE, fig.align="center", fig.cap="CLARA Approach. Two Feature, 4 Cluster Silhouette", , fig.height = 4}
+```{r plot_clara4, echo = FALSE, fig.align="center", fig.cap="CLARA Approach. Two Feature, 4 Cluster Silhouette" , out.width = "70%"}
 
 stats = victimStats[c("n_victims","place_type")] 
 clara = clara(stats, k = 4, metric = "euclidean",stand = T, samples = 100, sampsize =500)
@@ -740,7 +742,7 @@ fviz_silhouette(clara, title = "") +
 Unfortunately the result is not great. Average silhouette coefficient is about 0.5; one cluster has a negative value. We have made quite a few experiments with the various number of clusters and metrics without much success (the results of the experiments are not published in the report). Some sources suggested to use dummy encoding for the categorical values. We tried - this approach did not help either. It looks like the categorical features are not very well suited for clustering analysis (this is what **H** stats actually hinted). 
 
 Let's do another attempt this time we combine the number of victims and the number of gun used
-```{r plot_clara5, fig.align="center", fig.cap="CLARA Approach. Two Continuous Feature, 10 Cluster Silhouette"}
+```{r plot_clara5, fig.cap="CLARA Approach. Two Continuous Feature, 10 Cluster Silhouette", out.width = "70%"}
 victimStats = data %>% filter(n_victims >= 3 & n_guns_involved>0) %>% arrange(date)
 stats =  victimStats %>% select(n_victims, n_guns_involved)
 
@@ -749,8 +751,8 @@ fviz_silhouette(clara, title = "") +
   theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
 ```
 
-We have played with the number of clusters and found the one, which produces the most optimal result. Ten cluster give quite balance split. The only exception is cluster # 4 which seems to contained misplaced observations. But if we employ different metrics would it help? Let us see. We use *manhattan* this time
-```{r plot_clara6, fig.align="center", fig.cap="CLARA Approach. Two Continuous Feature, 10 Cluster Silhouette. Manhattan Metrics"}
+We have played with the number of clusters and found the one, which produces the most optimal result. Ten cluster give quite balanced split. The only exception is cluster # 4 which seems to contained misplaced observations. But if we employ different metrics would it help? Let us see. We use *manhattan* this time.
+```{r plot_clara6,  fig.cap="CLARA Approach. Two Continuous Feature, 10 Cluster Silhouette. Manhattan Metrics", out.width = "70%"}
 
 clara = clara(stats, k = 10, metric = "manhattan",stand = T, samples = 100, sampsize =500)
 fviz_silhouette(clara, title = "") 
@@ -758,14 +760,14 @@ fviz_silhouette(clara, title = "")
 ```
 Voilà! It worked. 
 
-```{r plot_clara7, fig.align="center", fig.cap="CLARA Approach. Two Continuous Feature, 10 Cluster Plot. Manhattan Metrics"}
+```{r plot_clara7, fig.cap="CLARA Approach. Two Continuous Feature, 10 Cluster Plot. Manhattan Metrics", out.width = "70%"}
 fviz_cluster(clara, stats, stand = F,  geom = "point", main="",
    axes = c(1,2), xlab = "N of Victims", ylab = "Number of Guns") 
 
 ```
 
 Geo-location of the clusters.
-```{r plot_clara8, fig.align="center", fig.cap="CLARA Approach. Two Continuous Feature, 10 Clusters. Manhattan Metrics. Number of Victims and Guns Clusters on Map"}
+```{r plot_clara8,  fig.cap="CLARA Approach. Two Continuous Feature, 10 Clusters. Manhattan Metrics. Number of Victims and Guns Clusters on Map", out.width = "80%"}
 combined = cbind(victimStats, cluster=c(clara$clustering))
 ggplot(victimStats, aes(x=longitude, y=latitude )) + 
   geom_point( color = clara$clustering+2L)
@@ -773,7 +775,7 @@ ggplot(victimStats, aes(x=longitude, y=latitude )) +
 
 So how do we interpret the clusters?
 
-```{r plot_clara9, fig.align="center", fig.cap="CLARA Approach. Number of Victims and Guns Cluster 3D Plot", echo = FALSE}
+```{r plot_clara9, fig.cap="CLARA Approach. Number of Victims and Guns Cluster 3D Plot", echo = FALSE}
 
 scatter3D( x = combined$cluster, y = combined$n_guns_involved, 
         z = combined$n_injured, 
@@ -783,17 +785,28 @@ scatter3D( x = combined$cluster, y = combined$n_guns_involved,
         labels = combined$cluster, col = mainPalette)
 
 ```
-Figure \ref{fig:plot_clara9} shows that the hideous crimes that number dozens of people injured are committed with greater number of the guns (cluster # 10). Another extreme is when relatively low number of people is hurt but the number of guns found in the crime scene is extremely high. This could be attributed to a police raid.   
+Figure \ref{fig:plot_clara9} shows that the hideous crimes that number dozens of the injured victims are committed with greater number of the guns (cluster # 10). Another extreme is when a relatively low number of people is hurt but the number of guns found in the crime scene is extremely high. This could be attributed to a police raid.   
 
+What if try to cluster dataset that includes geo-coordinates and categorical feature? Let's select observations that have number of victims killed greater or equal to 1, number of guns involved greater than zero and known place type.
+```{r plot_clara10, fig.cap="CLARA Approach. Continuous and Categorical Feature, 5 Cluster Silhouette", out.width = "70%"}
+victimStats = data %>% filter(n_victim_killed >= 1 & n_guns_involved>0 & place_type >0) %>% arrange(date)
+stats =  victimStats %>% select(longitude, latitude, n_victims, place_type)
+
+clara = clara(stats, k = 5, metric = "euclidean",stand = T, samples = 100, sampsize =500)
+fviz_silhouette(clara, title = "") +
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+```
+
+Again the parallel clustering method does not yield the satisfactory result.
 
 ## Agglomerative Hierarchical Clustering Approach (AGNES). 
 
-Next we are going to examine the same feature combinations using agglomerative clustering. We decided to choose the agglomerative clustering (AGNES) vs divisive method because the former generally has less challenges than the latter. In the case of the divisive method it is not always clear how to partition a large cluster into a smaller one. The agglomerative method start with the bottom and increase the cluster size based on the selected metrics.
+Next we are going to examine the same feature combinations using agglomerative clustering. We decided to choose the agglomerative clustering (AGNES) vs divisive method because the former generally has less challenges than the latter. In the case of the divisive method it is not always clear how to partition a large cluster into a smaller one (Ref: \cite{mining}). The agglomerative method starts from the bottom and increases the cluster size based on the selected metrics.
 
 As in the case of *CLARA* we start with the univariate feature set, employing *euclidean* metrics, cutting the tree at 4 clusters
 
 
-```{r plot_anges_s1, fig.align="center", fig.cap="AGNES Approach. 4 Cluster, Univariate Feature Silhouette", echo = FALSE}
+```{r plot_anges_s1,  fig.cap="AGNES Approach. 4 Cluster, Univariate Feature Silhouette", echo = FALSE, out.width = "70%"}
 victimStats = data %>% filter(n_victims >= 3 & place_type>0) %>% arrange(date)
 stats =  victimStats %>% select(n_victims)
 
@@ -803,9 +816,9 @@ agnes = factoextra::hcut(stats, k = 4,  hc_func ="agnes",
 fviz_silhouette(agnes, title = "") +
   theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
 ```
-Following our routine we review the silhouette coefficients. They are less satisfactory than the ones produced by *CLARA*. Further experimentation with the number of the clusters and distance metrics did yield better result. So we are moving on to the next feature set: *n_victims* and *n_guns_involved*
+Following our routine we review the silhouette coefficients. They are less satisfactory than the ones produced by *CLARA*. Further experimentation with the number of the clusters and distance metrics did not produce better result. So we are moving on to the next feature set: *n_victims* and *n_guns_involved*
 
-```{r plot_anges_s2, fig.align="center", fig.cap="AGNES Approach. 4 Cluster, Two Feature Silhouette", echo = FALSE}
+```{r plot_anges_s2, fig.cap="AGNES Approach. 4 Cluster, Two Feature Silhouette", echo = FALSE, out.width = "70%"}
 victimStats = data %>% filter(n_victims >= 3 & n_guns_involved>0) %>% arrange(date)
 stats =  victimStats %>% select(n_victims, n_guns_involved)
 
@@ -821,7 +834,7 @@ Just like the previous attempt *AGNES* failed to provide any meaningful clusters
 
 ## Density-based Clustering Approach (DBSCAN)
 
-Unlike the hierarchical and parallel methods the density-based approach can deal with the clustered data of any shape. The density-based method do not require specification of number of clusters either. It is quite interesting to see if *DBSCAN* would be able to discover data patterns overlooked by the previous two approaches. In the case of **DBSCAN** we need at least two-dimensional data. Thus we will again be using *n_victims* and *n_guns_involved*
+Unlike the hierarchical and parallel methods the density-based approach can deal with the clustered data of any shape. The density-based method do not require specification of number of clusters either. It is quite interesting to see if *DBSCAN* is able to discover data patterns overlooked by the previous two approaches (Ref: \cite{dbscan}) . In the case of **DBSCAN** we need at least two-dimensional data. Thus we will again be using *n_victims* and *n_guns_involved*
 
 Prior to applying the algorithm we have to find the hyper parameters of the *DBSCAN*, namely: 
 
@@ -830,55 +843,100 @@ Prior to applying the algorithm we have to find the hyper parameters of the *DBS
 
 For that we will employ *k nearest neighbors* method. The idea is to calculate, the average of the distances of every point to its k nearest neighbors. The value of k will be specified by us and corresponds to **minPoints**. We will start with *k* to 5  
 
-```{r plot_dbscan1, fig.align="center", fig.cap="DBSCAN Approach. Finding Hyper-Parameters", echo = FALSE}
+```{r plot_dbscan1,  fig.cap="DBSCAN Approach. Finding Hyper-Parameters", echo = FALSE, out.width = "60%"}
 victimStats = data %>% filter(n_victims >= 3 & n_guns_involved > 0) %>% arrange(date)
 stats =  victimStats %>% select(n_victims, n_guns_involved) %>% scale()
-dbscan::kNNdistplot(stats, k = 5) 
+dbscan::kNNdistplot(stats, k = 5) +
+abline(h=1.5, col=mainPalette[1], lty =  2) 
 ```
 
-The plot (Figure: \ref{fig:plot_dbsacan1}) has quite sharp elbow. It appears that **eps** = 1.5 would be a good starting value for 5 minimum points.  Let's run dbscan method
+The plot (Figure: \ref{fig:plot_dbscan1}) has quite sharp elbow. It appears that **eps** = 1.5 would be a good starting value for 5 minimum points.  Let's run dbscan method
 
-```{r plot_dbscan2, fig.align="center", fig.cap="DBSCAN Approach. Clusters", echo = FALSE}
+```{r plot_dbscan2,  fig.cap="DBSCAN Approach. Clusters", echo = FALSE, out.width = "70%"}
 dbs = dbscan::dbscan(stats, eps = 1.5, minPts = 5) 
 fviz_cluster(dbs, stats, stand = F,  geom = "point", main = "",
              axes = c(1,2), xlab = "Number of Victims", ylab = "Number of Guns")
 ```
 
-The result of the first attempt is not satisfactory. The method identified one cluster and lots outliers. Let add geo-coordinates. Spatial data should introduce more dense data, which hopefully will be picked by the algorithm
+The result of the first attempt is not satisfactory. The method identified one cluster and a lot of outliers. Let add geo-coordinates. Spatial data should introduce more dissimilarity which, hopefully, will be picked by the algorithm
 
-```{r plot_dbscan3, fig.align="center", fig.cap="DBSCAN Approach. Finding Hyper-Parameters for High-dimentional Dataset", echo = FALSE}
+```{r plot_dbscan3,  fig.cap="DBSCAN Approach. Finding Hyper-Parameters for High-dimentional Dataset", echo = FALSE, out.width = "60%"}
 stats =  victimStats %>% select(longitude, latitude,n_victims) %>% scale()
-dbscan::kNNdistplot(stats, k = 5) 
+dbscan::kNNdistplot(stats, k = 5) +
+abline(h=1, col=mainPalette[1], lty =  2)
 ```
 
 As per Figure \ref{fig:plot_dbscan3} we choose **1** for *eps*
 
-```{r plot_dbscan4, fig.align="center", fig.cap="DBSCAN Approach. Clusters", echo = FALSE}
+```{r plot_dbscan4,  fig.cap="DBSCAN Approach. Clusters", echo = FALSE, out.width = "70%"}
 dbs = dbscan::dbscan(stats, eps = 1, minPts = 5) 
 fviz_cluster(dbs, stats, stand = F,  geom = "point", main = "",
              axes = c(1,2), xlab = "Longitude", ylab = "Latitude")
 ```
 
-This approach has identified four clusters of violence. Let's view how the incidents are spread geographically
+This approach has identified four clusters. Let's view how the incidents are spread geographically
 
-```{r plot_dbscan5, fig.align="center", fig.cap="DBSCAN Approach. Victims of Gun Violence on the Map", echo = FALSE}
-
+```{r plot_dbscan5, fig.cap="DBSCAN Approach. Victims of Gun Violence on the Map", echo = FALSE, out.width = "90%"}
 ggplot(victimStats, aes(x=longitude, y=latitude )) + 
   geom_point( color = dbs$cluster+1L)
+```
+
+Lastly we are going to increase dimentionality of the dataset adding **place_type** categorical feature. So we will be clustering data set that have geo-coordinates, number of victims and a place type.
+```{r plot_dbscan6,  fig.cap="DBSCAN Approach. Finding Hyper-Parameters for High-dimentional Dataset with Categorical Feature", echo = FALSE, out.width = "60%"}
+victimStats = data %>% filter(n_victims >= 3 & place_type > 0) %>% arrange(date)
+stats =  victimStats %>% select(longitude, latitude,n_victims,place_type) %>% scale()
+dbscan::kNNdistplot(stats, k = 5) +
+abline(h=1.1, col=mainPalette[1], lty =  2)
+```
+We will be using *eps* = 1.1
+
+```{r plot_dbscan7,  fig.cap="DBSCAN Approach. Clusters with Categorical features", echo = FALSE, out.width = "70%"}
+dbs = dbscan::dbscan(stats, eps = 1.1, minPts = 5) 
+fviz_cluster(dbs, stats, stand = F,  geom = "point", main = "",
+             axes = c(1,2), xlab = "Number of Victims", ylab = "Number of Guns")
+```
+
+Let's review the cluster content.
+
+```{r plot_dbscan8, fig.cap="DBSCAN Approach. Number of Victims and lace Type Cluster 3D Plot", echo = FALSE, out.width = "80%"}
+combined = cbind(victimStats, cluster=c(dbs$cluster))
+scatter3D( x = combined$cluster, y = combined$place_type, 
+        z = combined$n_victims, 
+        xlab = "Cluster", ylab = "Place Type", zlab = "Number of Vicitms",
+        phi = 20, bty = "g", type="h", theta = 32,
+        pch = 20, cex = 1.5, ticktype = "detailed",
+        labels = combined$cluster, col = mainPalette)
 
 ```
 
+As per Figure \ref{fig:plot_dbscan8} the latest **DBSCAN* run grouped the data geographically. It did not find *place type* and *number of victims* significant enough to form clusters based on those two features.   
 
 
-## Clustering Method Evaluation
+## Clustering Method Evaluation 
 
+We have applied three different clustering algorithm. The parallel clustering method **CLARA** performed the best on both univariate and multi-dimensional datasets. Tweaking the number of clusters and distance metrics we were able to find meaningful clusters with good separation and density. (see Figure \ref{fig:plot_clara1} and \ref{fig:plot_clara6} ). This approach did fail to cluster categorical data.
+
+Neither hierarchical nor density-based approach performed particularly well. *DBSCAN* produced slightly better result when we added geo-coordinates, but the result was pretty meaningless. The density-based approach grouped data by longitude and latitude drawing the map of the USA...
 
 
 # Model Deployment
 
+Unfortunately we can state that the clustering methods were not effective for the selected dataset. Apparently hat frequency based analysis would yield much better result.
+
 
 # Conclusion
 
+We selected **Gun Violence in the US** dataset hoping to discover new relationship between various attributes, which would provide new insights into the goring problem of gun violence in the states. 
+
+We spent significant efforts parsing and cleaning the data. We started with imputing missing geographic coordinates employing *OpenCage* geocoding service. Then we separated redundant and useful features. Majority of the useful features contained delimiter-separated, free-text values. We figured out the pattern and came up with the parsing method. We parsed the free-text data and added many new categorical.
+
+We also processed descriptive features applying data mining techniques. We counted the most frequently used terms to understand the content of the features. We counted the words, bi-grams and tri-grams. we successfully identified the most common words and phrase and used them to add even more categorical features, enriching the dataset with meaningful data.
+
+When the data preprocessing was done we measured Hopkins statistics to evaluate cluster tendency of the data set. The result was satisfactory; we proceeded with the clusterization. 
+
+We applied various clustering approaches trying to find hidden trends and patterns. During this exercise we realized that the clustering methods did not work as well as we expected. We used *Sighloutte* test to validate the quality of the clusters. **CLARA** approach was the most successful among the three methods we picked (they were *CLARA*, *AGNES* and *DBSCAN*). We tried univariate and multivariate datasets, different metrics and number of clusters. Conducting our research we concluded that categorical features do not cluster well. We tried scaled features and dummy-encoded ones with the same less-than-satisfactory result.
+
+Overall we were not able apply unsupervised learning to reach our goal, but we did learn about clustering approach and developed intuition in which situation it is the best to employ them.
 
 
 \bibliography{RJreferences}
