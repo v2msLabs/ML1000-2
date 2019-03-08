@@ -5,6 +5,7 @@ library(dplyr)
 library(tidyr)
 library(cluster)
 library(RColorBrewer) # color palettes
+library(jcolors)
 
 # read data
 victimData = read.csv("./www/victims-stats.csv", header = TRUE, sep=",")
@@ -12,8 +13,8 @@ numVicitms = victimData[c("n_victims")] %>% scale()
 nRows =  nrow(numVicitms)
 clusters = rep(1,nRows)
 metrics = c("euclidean", "manhattan")
-colors =  colorNumeric("Paired", c(1,2,3,4,5,6,7,8,9,10), n = 10)
-
+colors =  colorNumeric(jcolors('rainbow'), c(1,2,3,4,5,6,7,8,9,10), n = 10)
+#colors =  colorNumeric("Paired", c(1,2,3,4,5,6,7,8,9,10), n = 10)
 
 placeDecoder = function(code){
   place = ""
