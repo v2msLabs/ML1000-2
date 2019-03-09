@@ -20,4 +20,4 @@ To run the project code:
 
 ## Shiny App
 
-URL: [Gun Violence in the US App](https://v2ms-labs.shinyapps.io)
+URL: [Gun Violence in the US App](https://v2ms-labs.shinyapps.io/gun-violence/)

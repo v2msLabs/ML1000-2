@@ -57,7 +57,7 @@ knitr::opts_chunk$set(fig.pos = 'H', echo = T,comment = NA, prompt = F,
 
 ## Background
 
-Gun violence in the US is a groing problem. Mass-shooting, gun-assited suisides, accidental use of guns that cause death have become regular topic of the news agencies.  
+Gun violence in the US is a going problem. Mass-shooting, gun-assited suisides, accidental use of guns that cause death have become regular topic of the news agencies.  
 
 
 ## Objective
